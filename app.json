@@ -1,0 +1,45 @@
+{
+  "expo": {
+<<<<<<< HEAD
+    "name": "Hostel-Management",
+    "slug": "Hostel-Management",
+    "version": "1.0.0",
+    "scheme": "hostel-management",
+=======
+    "name": "ApiApp",
+    "slug": "ApiApp",
+    "version": "1.0.0",
+    "scheme":"apiapp",
+>>>>>>> a84e63a564fa1dcb48c79829b18427dea9a9c781
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+<<<<<<< HEAD
+      "favicon": "./assets/favicon.png"
+=======
+      "favicon": "./assets/favicon.png",
+      "bundler":"metro"
+>>>>>>> a84e63a564fa1dcb48c79829b18427dea9a9c781
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
