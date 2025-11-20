@@ -29,10 +29,11 @@ export default function StudentLayout() {
       />
       {/* NEW COMPLAINTS TAB */}
       <Tabs.Screen
-        name="complaints"
+        name="complaints" 
         options={{
-          title: 'Complaints',
-          tabBarIcon: ({ color, size }) => <Ionicons name="alert-circle" size={size} color={color} />,
+          title: 'Help', // Header Title
+          tabBarLabel: 'Help', // <--- THIS FIXES THE TAB NAME
+          tabBarIcon: ({ color, size }) => <Ionicons name="help-buoy" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -49,6 +50,9 @@ export default function StudentLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
         }}
       />
+
+    
+
     </Tabs>
   );
 }

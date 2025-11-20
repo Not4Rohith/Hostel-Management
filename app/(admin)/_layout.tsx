@@ -4,9 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 import { colors } from '../../src/constants/colors';
 
+
 export default function AdminLayout() {
   const theme = useTheme();
-
   return (
     <Tabs
       screenOptions={{
@@ -30,13 +30,20 @@ export default function AdminLayout() {
       }}
     >
       {/* Tab 1: The Dashboard (Stats) */}
+      {/* Tab 1: Dashboard (Restored) */}
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Overview',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="mess"
+        options={{
+          title: 'Mess Menu',
+          tabBarIcon: ({ color, size }) => <Ionicons name="restaurant-outline" size={size} color={color} />,
         }}
       />
 
@@ -56,12 +63,16 @@ export default function AdminLayout() {
         name="complaints"
         options={{
           title: 'Issues',
-          tabBarLabel: 'Issues', // Explicit label
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="alert-circle-outline" size={size} color={color} />
-          ),
+          tabBarLabel: 'Issues',
+          // Ensure you are importing Ionicons at the top!
+          tabBarIcon: ({ color, size }) => <Ionicons name="alert-circle-outline" size={size} color={color} />,
         }}
       />
+
+      
+
+      
     </Tabs>
   );
 }
+

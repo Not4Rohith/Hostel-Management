@@ -2,21 +2,23 @@ import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Text, SegmentedButtons, IconButton, Badge } from 'react-native-paper';
 import { colors } from '../../src/constants/colors';
-
+import { useRouter } from 'expo-router';
 // Import the new separated components
 import ChatSection from '../../src/components/community/ChatSection';
 import LostFoundSection from '../../src/components/community/LostFoundSection';
 
+
+
 export default function CommunityScreen() {
   const [view, setView] = useState('chat'); 
-
+  const router = useRouter();
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.topRow}>
           <Text variant="headlineSmall" style={styles.title}>Community</Text>
-          <TouchableOpacity onPress={() => console.log("Go to DMs")}>
+          <TouchableOpacity onPress={() => router.push('/messages/inbox')}>
              <View>
                <IconButton icon="message-text-outline" size={28} iconColor={colors.primary} />
                <Badge size={16} style={styles.badge}>3</Badge>

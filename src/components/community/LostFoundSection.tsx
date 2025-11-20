@@ -5,6 +5,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../constants/colors';
 import { MOCK_LOST_FOUND_DATA, submitLostFoundItem } from '../../services/api';
 import { LostItem } from '../../types'; // <--- THIS FIXES THE TYPESCRIPT ERROR
+// Import the new auto-send function
+import { autoSendFoundMessage } from '../../services/api';
+
 
 export default function LostFoundSection() {
   // Explicitly tell State that this is an array of LostItem
@@ -64,15 +67,25 @@ export default function LostFoundSection() {
     setFoundModalVisible(true);
   };
 
-  const handleSubmitFound = () => {
-    if (!foundProof.image || !foundProof.contact.trim()) return;
+  const handleSubmitFound = async () => { // Make it async
+  if (!foundProof.image || !foundProof.contact.trim()) return;
 
-    const updatedList = lostItems.map(item => 
-      item.id === selectedItemId ? { ...item, type: 'FOUND' as const, foundBy: foundProof.contact } : item
-    );
-    setLostItems(updatedList);
-    setFoundModalVisible(false);
-  };
+  // 1. Update UI locally
+  const updatedList = lostItems.map(item => 
+    item.id === selectedItemId ? { ...item, type: 'FOUND' as const, foundBy: foundProof.contact } : item
+  );
+  setLostItems(updatedList);
+
+  // 2. AUTO DM LOGIC
+  const itemDetails = lostItems.find(i => i.id === selectedItemId);
+  if (itemDetails) {
+      // Simulate sending DM to the person who lost it (itemDetails.contact)
+      await autoSendFoundMessage(itemDetails.item, foundProof.contact, itemDetails.contact);
+      alert(`Proof uploaded! A message has been sent to ${itemDetails.contact}`);
+  }
+
+  setFoundModalVisible(false);
+};
 
   return (
     <View style={styles.container}>
