@@ -25,48 +25,68 @@ export default function AdminMessScreen() {
 
   const loadMenu = async () => {
     const data = await fetchMenu();
-    setMenu(data);
+    setMenu(data || {});
     setLoading(false);
   };
 
   const openEditModal = () => {
-    const dayMenu = menu[selectedDay] || {};
+    const dayMenu = menu?.[selectedDay] || {};
+    
+    const getValue = (field: any) => {
+      if (!field) return '';
+      if (typeof field === 'string') return field === 'Not Set' ? '' : field;
+      if (field.item) return field.item === 'Not Set' ? '' : field.item;
+      return '';
+    };
+
     setEditData({
-      Breakfast: dayMenu.Breakfast?.item || '',
-      Lunch: dayMenu.Lunch?.item || '',
-      Snacks: dayMenu.Snacks?.item || '',
-      Dinner: dayMenu.Dinner?.item || '',
+      Breakfast: getValue(dayMenu.Breakfast),
+      Lunch: getValue(dayMenu.Lunch),
+      Snacks: getValue(dayMenu.Snacks),
+      Dinner: getValue(dayMenu.Dinner),
     });
+    
     setModalVisible(true);
   };
 
   const handleSave = async () => {
     setSaving(true);
     
-    // Construct new menu object for this day
-    const newMenuForDay = {
-      Breakfast: { item: editData.Breakfast, time: '7:30 - 9:00 AM' },
-      Lunch: { item: editData.Lunch, time: '12:30 - 2:00 PM' },
-      Snacks: { item: editData.Snacks, time: '4:30 - 5:30 PM' },
-      Dinner: { item: editData.Dinner, time: '7:30 - 9:00 PM' },
+    // --- THE FIX IS HERE: USE LOWERCASE KEYS ---
+    const payload = {
+      breakfast: editData.Breakfast || "Not Set", // <--- Changed to lowercase 'b'
+      lunch: editData.Lunch || "Not Set",         // <--- Changed to lowercase 'l'
+      snacks: editData.Snacks || "Not Set",       // <--- Changed to lowercase 's'
+      dinner: editData.Dinner || "Not Set",       // <--- Changed to lowercase 'd'
     };
 
-    await updateMenuData(selectedDay, newMenuForDay);
+    console.log("Admin UI Sending:", payload); 
+
+    // We pass 'payload' which now has lowercase keys
+    await updateMenuData(selectedDay, payload);
     
-    // Update local state instantly
-    setMenu({ ...menu, [selectedDay]: newMenuForDay });
+    // For Local UI update, we keep the Capitalized structure the App expects
+    const updatedLocalMenu = {
+      ...menu,
+      [selectedDay]: {
+        Breakfast: { item: payload.breakfast, time: '7:30 - 9:00 AM' },
+        Lunch: { item: payload.lunch, time: '12:30 - 2:00 PM' },
+        Snacks: { item: payload.snacks, time: '4:30 - 5:30 PM' },
+        Dinner: { item: payload.dinner, time: '7:30 - 9:00 PM' }
+      }
+    };
     
+    setMenu(updatedLocalMenu);
     setSaving(false);
     setModalVisible(false);
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
 
-  const currentMenu = menu[selectedDay] || {}; 
+  const currentMenu = menu?.[selectedDay] || {}; 
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
             <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: colors.primary }}>Mess Manager</Text>
@@ -75,7 +95,6 @@ export default function AdminMessScreen() {
         <Ionicons name="settings-outline" size={24} color={colors.primary} />
       </View>
 
-      {/* Day Selector */}
       <View style={{ height: 50, marginBottom: 10 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayScroll}>
           {DAYS.map((day) => (
@@ -92,7 +111,6 @@ export default function AdminMessScreen() {
         </ScrollView>
       </View>
 
-      {/* Menu List */}
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 80 }}>
         {['Breakfast', 'Lunch', 'Snacks', 'Dinner'].map((type) => (
            <MealCard 
@@ -105,28 +123,18 @@ export default function AdminMessScreen() {
         ))}
       </ScrollView>
 
-      {/* EDIT BUTTON */}
-      <FAB
-        icon="pencil"
-        label="Edit Menu"
-        style={styles.fab}
-        onPress={openEditModal}
-        color="white"
-      />
+      <FAB icon="pencil" label="Edit Menu" style={styles.fab} onPress={openEditModal} color="white" />
 
-      {/* --- EDIT MODAL --- */}
       <Portal>
         <Modal visible={modalVisible} onDismiss={() => setModalVisible(false)} contentContainerStyle={styles.modal}>
           <Text variant="headlineSmall" style={{ fontWeight: 'bold', marginBottom: 15 }}>Update Menu ({selectedDay})</Text>
           
-          <TextInput label="Breakfast Item" value={editData.Breakfast} onChangeText={t => setEditData({...editData, Breakfast: t})} mode="outlined" style={styles.input} />
-          <TextInput label="Lunch Item" value={editData.Lunch} onChangeText={t => setEditData({...editData, Lunch: t})} mode="outlined" style={styles.input} />
-          <TextInput label="Snacks Item" value={editData.Snacks} onChangeText={t => setEditData({...editData, Snacks: t})} mode="outlined" style={styles.input} />
-          <TextInput label="Dinner Item" value={editData.Dinner} onChangeText={t => setEditData({...editData, Dinner: t})} mode="outlined" style={styles.input} />
+          <TextInput label="Breakfast Item" value={editData.Breakfast} onChangeText={t => setEditData(prev => ({...prev, Breakfast: t}))} mode="outlined" style={styles.input} />
+          <TextInput label="Lunch Item" value={editData.Lunch} onChangeText={t => setEditData(prev => ({...prev, Lunch: t}))} mode="outlined" style={styles.input} />
+          <TextInput label="Snacks Item" value={editData.Snacks} onChangeText={t => setEditData(prev => ({...prev, Snacks: t}))} mode="outlined" style={styles.input} />
+          <TextInput label="Dinner Item" value={editData.Dinner} onChangeText={t => setEditData(prev => ({...prev, Dinner: t}))} mode="outlined" style={styles.input} />
 
-          <Button mode="contained" onPress={handleSave} loading={saving} style={{ marginTop: 10 }}>
-            Save Changes
-          </Button>
+          <Button mode="contained" onPress={handleSave} loading={saving} style={{ marginTop: 10 }}>Save Changes</Button>
         </Modal>
       </Portal>
     </View>

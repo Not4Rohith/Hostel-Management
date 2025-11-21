@@ -1,46 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, TextInput, IconButton, useTheme, Appbar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MOCK_CHATS, sendDM, ChatThread } from '../../src/services/api';
+import { fetchChats, sendDM } from '../../src/services/api'; // Use the new API functions
 
 export default function ChatDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id, name } = useLocalSearchParams();
+  const { id, name } = useLocalSearchParams(); // 'id' here is the OTHER USER'S ID
   
   const [msgText, setMsgText] = useState('');
-  const [thread, setThread] = useState<ChatThread | undefined>(undefined);
+  const [messages, setMessages] = useState<any[]>([]);
 
   useEffect(() => {
-    const chat = MOCK_CHATS.find(c => c.id === id);
-    setThread(chat);
+    loadThread();
+    // Auto-refresh DMs every 3 seconds too
+    const interval = setInterval(loadThread, 3000);
+    return () => clearInterval(interval);
   }, [id]);
 
-  const handleSend = async () => {
-    if (!msgText.trim() || !id) return;
-    const newMsg = { id: Date.now().toString(), text: msgText, sender: 'me' as const, timestamp: Date.now() };
-    if (thread) {
-        setThread({ ...thread, messages: [...thread.messages, newMsg] });
+  const loadThread = async () => {
+    // Fetch all threads and find the one with this user
+    // (Inefficient for huge apps, but perfect for this scale)
+    const allThreads = await fetchChats();
+    const thisThread = allThreads.find((t: any) => t.id === id);
+    if (thisThread) {
+        setMessages(thisThread.messages.reverse());
     }
-    await sendDM(id as string, msgText);
-    setMsgText('');
   };
 
-  if (!thread) return <View style={{flex:1, justifyContent:'center'}}><Text style={{textAlign:'center'}}>Chat not found</Text></View>;
+  const handleSend = async () => {
+    if (!msgText.trim()) return;
+    
+    // Send to Backend
+    await sendDM(id as string, msgText);
+    setMsgText('');
+    loadThread(); // Refresh UI
+  };
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex:1, backgroundColor:'white'}}>
-      
-      {/* --- STANDARD HEADER --- */}
       <Appbar.Header style={{backgroundColor: 'white', elevation: 1}}>
-        {/* This back action strictly goes to the previous screen (Inbox) */}
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title={name as string} />
       </Appbar.Header>
 
       <FlatList
-        data={[...thread.messages].reverse()}
+        data={messages}
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16 }}
         inverted 
