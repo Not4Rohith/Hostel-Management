@@ -1,109 +1,81 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, ScrollView } from 'react-native';
+import { View, FlatList, StyleSheet } from 'react-native';
 import { Text, FAB, Modal, Portal, TextInput, Button, ActivityIndicator, SegmentedButtons, Card, Chip, useTheme } from 'react-native-paper';
 import { fetchComplaints, submitComplaint, fetchLeaveRequests, submitLeaveRequest } from '../../src/services/api';
 import { colors } from '../../src/constants/colors';
 import ComplaintCard from '../../src/components/cards/ComplaintCard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HelpScreen() {
-  const theme = useTheme();
-  const [view, setView] = useState('issues'); // 'issues' or 'gatepass'
-  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState('issues'); 
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<any>(null);
   
-  // --- STATES FOR ISSUES ---
   const [complaints, setComplaints] = useState<any[]>([]);
-  const [issueModal, setIssueModal] = useState(false);
-  const [newIssue, setNewIssue] = useState({ title: '', category: '' });
-
-  // --- STATES FOR GATE PASS ---
   const [leaves, setLeaves] = useState<any[]>([]);
+  
+  // Modals
+  const [issueModal, setIssueModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
+  
+  // Form Data
+  const [newIssue, setNewIssue] = useState({ title: '', category: '' });
   const [newLeave, setNewLeave] = useState({ reason: '', from: '', to: '' });
 
   useEffect(() => {
-    loadData();
-  }, [view]);
+    const init = async () => {
+      const userStr = await AsyncStorage.getItem('user');
+      if (userStr) {
+        const id = JSON.parse(userStr).id;
+        setUserId(id);
+        loadAllData(id); // Load BOTH lists on mount
+      }
+    };
+    init();
+  }, []);
 
-  const loadData = async () => {
+  const loadAllData = async (id: any) => {
     setLoading(true);
-    if (view === 'issues') {
-      const data = await fetchComplaints();
-      setComplaints(data as any[]);
-    } else {
-      const data = await fetchLeaveRequests();
-      setLeaves(data as any[]);
+    try {
+      // Fetch BOTH in parallel so switching tabs is instant
+      const [issuesData, leavesData] = await Promise.all([
+        fetchComplaints(), // api.ts handles passing ID internally now
+        fetchLeaveRequests()
+      ]);
+      
+      setComplaints(issuesData || []);
+      setLeaves(leavesData || []);
+    } catch (e) {
+      console.error("Load Error:", e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  // --- SUBMIT ISSUE ---
   const handleIssueSubmit = async () => {
     if (!newIssue.title || !newIssue.category) return;
-    const payload = { id: Math.random(), ...newIssue, status: 'Pending', date: 'Today' };
-    await submitComplaint(payload);
-    setComplaints([payload, ...complaints]);
-    setIssueModal(false);
-    setNewIssue({ title: '', category: '' });
+    try {
+      // Submit to backend
+      await submitComplaint({ ...newIssue, userId });
+      setIssueModal(false);
+      setNewIssue({ title: '', category: '' });
+      loadAllData(userId); // Refresh lists
+    } catch (e) { alert('Failed to submit'); }
   };
 
-  // --- SUBMIT LEAVE ---
   const handleLeaveSubmit = async () => {
     if (!newLeave.reason || !newLeave.from) return;
-    const payload = { 
-      id: Math.random().toString(), 
-      name: 'Rohith', // Hardcoded for now (in real app, get from User Store)
-      room: '302', 
-      status: 'Pending',
-      ...newLeave 
-    };
-    await submitLeaveRequest(payload);
-    setLeaves([payload, ...leaves]);
-    setLeaveModal(false);
-    setNewLeave({ reason: '', from: '', to: '' });
+    try {
+      // Submit to backend
+      await submitLeaveRequest({ ...newLeave, studentId: userId });
+      setLeaveModal(false);
+      setNewLeave({ reason: '', from: '', to: '' });
+      loadAllData(userId); // Refresh lists
+    } catch (e) { alert('Failed to submit request'); }
   };
-
-  // --- RENDERERS ---
-  const renderIssues = () => (
-    <>
-      <FlatList
-        data={complaints}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        renderItem={({ item }) => (
-          <ComplaintCard title={item.title} category={item.category} status={item.status} date={item.date} />
-        )}
-      />
-      <FAB icon="plus" label="Report Issue" style={styles.fab} onPress={() => setIssueModal(true)} color="white" />
-    </>
-  );
-
-  const renderGatePass = () => (
-    <>
-      <FlatList
-        data={leaves}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <Card.Title 
-              title="Gate Pass Request"
-              subtitle={`${item.from} - ${item.to}`}
-              right={(props) => <Chip style={{marginRight:10, backgroundColor: item.status === 'Approved' ? '#E8F5E9' : '#FFEBEE'}}>{item.status}</Chip>}
-            />
-            <Card.Content>
-              <Text variant="bodyMedium">Reason: {item.reason}</Text>
-            </Card.Content>
-          </Card>
-        )}
-        ListEmptyComponent={<Text style={{textAlign:'center', marginTop: 20, color:'#888'}}>No leave history.</Text>}
-      />
-      <FAB icon="walk" label="Apply Leave" style={styles.fab} onPress={() => setLeaveModal(true)} color="white" />
-    </>
-  );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
          <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: colors.primary, marginBottom: 15 }}>Help & Requests</Text>
          <SegmentedButtons
@@ -116,34 +88,70 @@ export default function HelpScreen() {
         />
       </View>
 
-      {/* Content */}
       <View style={{flex: 1, padding: 16}}>
-        {loading ? <ActivityIndicator /> : (view === 'issues' ? renderIssues() : renderGatePass())}
+        {loading ? <ActivityIndicator color={colors.primary} style={{marginTop: 50}} /> : (
+          view === 'issues' ? (
+            <>
+              <FlatList
+                data={complaints}
+                keyExtractor={item => item.id.toString()}
+                renderItem={({ item }) => (
+                  <ComplaintCard 
+                    title={item.title} 
+                    category={item.category} 
+                    status={item.status} 
+                    date={item.date || item.createdAt?.split('T')[0]} 
+                  />
+                )}
+                ListEmptyComponent={<Text style={{textAlign:'center', color:'#888', marginTop: 20}}>No issues reported.</Text>}
+              />
+              <FAB icon="plus" label="Report Issue" style={styles.fab} onPress={() => setIssueModal(true)} color="white" />
+            </>
+          ) : (
+            <>
+              <FlatList
+                data={leaves}
+                keyExtractor={item => item.id.toString()}
+                renderItem={({ item }) => (
+                  <Card style={styles.card}>
+                    <Card.Title 
+                      title={item.reason}
+                      subtitle={`${item.from} - ${item.to}`}
+                      right={(props) => (
+                        <Chip style={{marginRight:10, backgroundColor: item.status === 'Approved' ? '#E8F5E9' : item.status === 'Rejected' ? '#FFEBEE' : '#FFF3E0'}}>
+                          {item.status}
+                        </Chip>
+                      )}
+                    />
+                  </Card>
+                )}
+                ListEmptyComponent={<Text style={{textAlign:'center', color:'#888', marginTop: 20}}>No gate passes found.</Text>}
+              />
+              <FAB icon="walk" label="Apply Leave" style={styles.fab} onPress={() => setLeaveModal(true)} color="white" />
+            </>
+          )
+        )}
       </View>
 
-      {/* --- MODAL: REPORT ISSUE --- */}
+      {/* Modals */}
       <Portal>
         <Modal visible={issueModal} onDismiss={() => setIssueModal(false)} contentContainerStyle={styles.modal}>
-          <Text variant="titleLarge" style={{fontWeight:'bold', marginBottom: 10}}>Report Issue</Text>
+          <Text variant="titleLarge" style={{marginBottom:10}}>Report Issue</Text>
           <TextInput label="Problem" value={newIssue.title} onChangeText={t => setNewIssue({...newIssue, title: t})} mode="outlined" style={styles.input} />
-          <TextInput label="Category (e.g. Electrical)" value={newIssue.category} onChangeText={t => setNewIssue({...newIssue, category: t})} mode="outlined" style={styles.input} />
-          <Button mode="contained" onPress={handleIssueSubmit} style={{marginTop: 10}}>Submit Report</Button>
+          <TextInput label="Category" value={newIssue.category} onChangeText={t => setNewIssue({...newIssue, category: t})} mode="outlined" style={styles.input} />
+          <Button mode="contained" onPress={handleIssueSubmit}>Submit</Button>
         </Modal>
-      </Portal>
 
-      {/* --- MODAL: APPLY LEAVE --- */}
-      <Portal>
         <Modal visible={leaveModal} onDismiss={() => setLeaveModal(false)} contentContainerStyle={styles.modal}>
-          <Text variant="titleLarge" style={{fontWeight:'bold', marginBottom: 10}}>Apply Gate Pass</Text>
-          <TextInput label="Reason for Leave" value={newLeave.reason} onChangeText={t => setNewLeave({...newLeave, reason: t})} mode="outlined" style={styles.input} />
-          <View style={{flexDirection:'row', gap: 10}}>
-             <TextInput label="From (DD/MM)" value={newLeave.from} onChangeText={t => setNewLeave({...newLeave, from: t})} mode="outlined" style={[styles.input, {flex:1}]} />
-             <TextInput label="To (DD/MM)" value={newLeave.to} onChangeText={t => setNewLeave({...newLeave, to: t})} mode="outlined" style={[styles.input, {flex:1}]} />
+          <Text variant="titleLarge" style={{marginBottom:10}}>Request Gate Pass</Text>
+          <TextInput label="Reason" value={newLeave.reason} onChangeText={t => setNewLeave({...newLeave, reason: t})} mode="outlined" style={styles.input} />
+          <View style={{flexDirection:'row', gap:10}}>
+             <TextInput label="From" value={newLeave.from} onChangeText={t => setNewLeave({...newLeave, from: t})} mode="outlined" style={[styles.input, {flex:1}]} />
+             <TextInput label="To" value={newLeave.to} onChangeText={t => setNewLeave({...newLeave, to: t})} mode="outlined" style={[styles.input, {flex:1}]} />
           </View>
-          <Button mode="contained" onPress={handleLeaveSubmit} style={{marginTop: 10}}>Request Pass</Button>
+          <Button mode="contained" onPress={handleLeaveSubmit}>Request</Button>
         </Modal>
       </Portal>
-
     </View>
   );
 }

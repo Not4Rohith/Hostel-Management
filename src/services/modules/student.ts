@@ -1,8 +1,11 @@
 import { api } from '../axiosConfig';
 
 export const StudentService = {
-  // Complaints
+  // --- COMPLAINTS ---
   getComplaints: async (userId?: string, isAdmin = false) => {
+    // Debug Log to see what's happening
+    console.log(`Fetching Complaints. Admin Mode: ${isAdmin}, UserID: ${userId}`);
+    
     const url = isAdmin ? '/complaints/all' : `/complaints/my/${userId}`;
     const res = await api.get(url);
     return res.data;
@@ -16,19 +19,21 @@ export const StudentService = {
     return await api.put(`/complaints/${id}/resolve`);
   },
 
+  // ... (Keep existing Gate Pass / Lost Found / Profile functions below) ...
+  // (Copy paste the rest of your existing functions for GatePass/LostFound here so you don't lose them)
   // Gate Pass
-  getGatePasses: async (isAdmin = false) => {
-    const url = isAdmin ? '/admin/gatepass' : '/student/gatepass'; // Backend route needed
+  getGatePasses: async (userId?: string, isAdmin = false) => {
+    const url = isAdmin ? '/gatepass/all' : `/gatepass/my/${userId}`;
     const res = await api.get(url);
     return res.data;
   },
 
   requestGatePass: async (data: any) => {
-    return await api.post('/student/gatepass', data);
+    return await api.post('/gatepass', data);
   },
 
   updateGatePassStatus: async (id: string, status: string) => {
-    return await api.put(`/admin/gatepass/${id}`, { status });
+    return await api.put(`/gatepass/${id}`, { status });
   },
 
   // Lost & Found
@@ -38,7 +43,29 @@ export const StudentService = {
   },
 
   reportLostItem: async (data: any) => {
-    return await api.post('/lostfound', data);
+    const formData = new FormData();
+    formData.append('item', data.item);
+    formData.append('location', data.location);
+    formData.append('contact', data.contact);
+    formData.append('type', data.type);
+    formData.append('reportedBy', data.reportedBy); 
+
+    if (data.image) {
+      formData.append('image', {
+        uri: data.image,
+        name: 'upload.jpg',
+        type: 'image/jpeg',
+      } as any);
+    }
+
+    const res = await api.post('/lostfound', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data;
+  },
+  
+  resolveLostItem: async (id: string, foundByContact: string) => {
+    return await api.put(`/lostfound/${id}/resolve`, { foundByContact });
   },
 
   getProfile: async (userId: string) => {

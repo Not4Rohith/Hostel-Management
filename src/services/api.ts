@@ -289,29 +289,69 @@ export { AdminService, StudentService, ChatService, MessService };
 // ====================================================================
 // 1. AUTH & USER HELPERS
 // ====================================================================
-const getCurrentUserId = async () => {
+
+// Get the FULL user object (needed for Role check)
+const getCurrentUser = async () => {
   const userStr = await AsyncStorage.getItem('user');
-  return userStr ? JSON.parse(userStr).id : null;
+  return userStr ? JSON.parse(userStr) : null;
+};
+
+// Get just the ID (needed for Chat)
+const getCurrentUserId = async () => {
+  const user = await getCurrentUser();
+  return user ? user.id : null;
 };
 
 // ====================================================================
-// 2. GENERAL CHAT (Community Tab)
+// 2. DYNAMIC FETCHES (Role Based - THE FIX)
+// ====================================================================
+
+// FIX: Check Role to decide if we fetch ALL or just MY complaints
+export const fetchComplaints = async () => {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const isAdmin = user.role === 'admin';
+    
+    // If Admin -> true (Fetch All). If Student -> false (Fetch Mine).
+    return await StudentService.getComplaints(user.id, isAdmin);
+  } catch (error) {
+    console.error("Fetch Complaints Error:", error);
+    return [];
+  }
+};
+
+// FIX: Same logic for Gate Passes
+export const fetchLeaveRequests = async () => {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    const isAdmin = user.role === 'admin';
+
+    return await StudentService.getGatePasses(user.id, isAdmin);
+  } catch (error) {
+    console.error("Fetch Gate Pass Error:", error);
+    return [];
+  }
+};
+
+// ====================================================================
+// 3. GENERAL CHAT
 // ====================================================================
 export const fetchGeneralChat = async () => {
   try {
     const messages = await ChatService.getGeneralChat();
-    // Transform DB format to UI format
     return messages.map((msg: any) => ({
       id: msg.id.toString(),
       text: msg.content,
       user: msg.Sender ? msg.Sender.name : 'Unknown',
       time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      self: false, // Calculated in the component
-      senderId: msg.senderId, // Needed to calc 'self'
+      senderId: msg.senderId,
       isNotice: msg.isNotice
     }));
   } catch (error) {
-    console.log("General Chat Error", error);
     return [];
   }
 };
@@ -321,36 +361,27 @@ export const sendGeneralMessage = async (text: string) => {
   return await ChatService.sendMessage(text, userId, null, false);
 };
 
-
 // ====================================================================
-// 3. DM / INBOX SYSTEM (Real Backend)
+// 4. DM / INBOX SYSTEM
 // ====================================================================
-
-// Helper: Group raw messages into Threads (Inbox Format)
 const organizeDMsIntoThreads = (myId: number, rawMessages: any[]) => {
   const threadsMap = new Map();
-
   rawMessages.forEach(msg => {
-    // Determine who the "Other" person is
     const isMeSender = msg.senderId === myId;
     const otherUser = isMeSender ? msg.Receiver : msg.Sender;
-    
-    if (!otherUser) return; // Skip if user deleted
+    if (!otherUser) return; 
 
     const threadId = otherUser.id.toString();
-
     if (!threadsMap.has(threadId)) {
       threadsMap.set(threadId, {
         id: threadId,
         name: otherUser.name,
-        avatar: otherUser.name[0], // Initials
+        avatar: otherUser.name[0],
         lastMessage: msg.content,
-        unread: 0, // Logic for unread can be added later
+        unread: 0,
         messages: []
       });
     }
-    
-    // Add message to thread
     threadsMap.get(threadId).messages.push({
       id: msg.id.toString(),
       text: msg.content,
@@ -358,7 +389,6 @@ const organizeDMsIntoThreads = (myId: number, rawMessages: any[]) => {
       timestamp: new Date(msg.createdAt).getTime()
     });
   });
-
   return Array.from(threadsMap.values());
 };
 
@@ -366,14 +396,9 @@ export const fetchChats = async () => {
   try {
     const userId = await getCurrentUserId();
     if (!userId) return [];
-    
-    // 1. Get all raw messages from DB
     const rawMessages = await ChatService.getMyDMs(userId);
-    
-    // 2. Organize them into threads for the Inbox UI
     return organizeDMsIntoThreads(userId, rawMessages);
   } catch (error) {
-    console.error("Fetch DMs Error:", error);
     return [];
   }
 };
@@ -383,9 +408,8 @@ export const sendDM = async (receiverId: string, text: string) => {
   return await ChatService.sendMessage(text, senderId, receiverId, false);
 };
 
-
 // ====================================================================
-// 4. OTHER FEATURES (Admin, Mess, Etc)
+// 5. ADMIN & MESS UTILS
 // ====================================================================
 export const fetchAllStudents = AdminService.getAllStudents;
 export const addNewStudent = AdminService.addStudent;
@@ -399,55 +423,37 @@ export const fetchRooms = async () => {
 export const fetchMenu = MessService.getMenu;
 export const updateMenuData = AdminService.updateMenu;
 
-export const fetchComplaints = async () => {
-  const userId = await getCurrentUserId();
-  // Assuming logic inside components handles admin vs student check or we pass it here
-  // For safety, defaulting to student view unless admin logic added
-  return StudentService.getComplaints(userId); 
-};
-
+// ====================================================================
+// 6. SUBMIT ACTIONS
+// ====================================================================
 export const submitComplaint = StudentService.submitComplaint;
 export const resolveComplaintAPI = StudentService.resolveComplaint;
 
-export const fetchLeaveRequests = async () => StudentService.getGatePasses(true);
 export const submitLeaveRequest = StudentService.requestGatePass;
 export const updateGatePass = StudentService.updateGatePassStatus;
 
-// Lost & Found
 export const submitLostFoundItem = StudentService.reportLostItem;
-// Auto DM when item found
-export const autoSendFoundMessage = async (item: string, finderContact: string, ownerContact: string) => {
-  // In real app, we need the Owner's UserID, not just contact string.
-  // For now, we skip this or you need to look up UserID by Room Number.
-  console.log("Auto-DM requires UserID lookup logic");
-};
+export const fetchLostItems = StudentService.getLostItems;
+export const resolveLostItemAPI = StudentService.resolveLostItem;
 
-// Broadcast
 export const sendBroadcast = async (text: string, adminId: string) => {
   return ChatService.sendMessage(text, adminId, null, true);
 };
 
 export const fetchStudentData = async () => {
   try {
-    // 1. Get ID from local storage
     const userStr = await AsyncStorage.getItem('user');
     if (!userStr) return null;
     
     const { id } = JSON.parse(userStr);
-
-    // 2. Fetch fresh data from Backend
     const freshData = await StudentService.getProfile(id);
     
-    // 3. Return formatted data
     return {
       ...freshData,
-      // Ensure we fallback to defaults if fields are null
       course: freshData.course || 'Student', 
-      bedId: 'A', // Static for now as DB doesn't have Bed ID yet
       profileImage: freshData.profileImage || 'https://i.pravatar.cc/300',
     };
   } catch (error) {
-    console.log("Profile Fetch Error:", error);
     return null;
   }
 };
